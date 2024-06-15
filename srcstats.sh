@@ -45,6 +45,7 @@ find_command="find ${ROOT_DIRS[@]} -type f \\( $include_conditions \\) \\( $excl
 
 # Temporary file to store intermediate results
 temp_file=$(mktemp)
+aggregated_file=$(mktemp)
 
 # Debug function
 debug() {
@@ -90,7 +91,22 @@ eval $find_command | while read -r file; do
     echo -e "${trimmed_path}\t${longest_match}\t${lines_in_file}" >> "$temp_file"
 done
 
-cat "$temp_file"
+# Aggregate results
+awk -F'\t' '
+{
+    key = $1 "\t" $2
+    sum[key] += $3
+    count[key] += 1
+}
+END {
+    for (key in sum) {
+        print key "\t" sum[key] "\t" count[key]
+    }
+}
+' "$temp_file" > "$aggregated_file"
+
+# Output the aggregated results
+cat "$aggregated_file"
 
 # Cleanup
-rm "$temp_file"
+rm "$temp_file" "$aggregated_file"
