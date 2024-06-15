@@ -114,6 +114,7 @@ done < "$temp_file"
 
 # Aggregate results with specified depth and categories
 debug "Aggregating final results with max depth $MAX_DEPTH..."
+echo -e "path\tfiles\tlines"
 awk -v max_depth="$MAX_DEPTH" -F'\t' '
 function trim_path(path, depth) {
     split(path, parts, "/")
@@ -136,7 +137,7 @@ END {
         print dir "\t" files[dir] "\t" lines[dir]
     }
 }
-' "$consolidated_file"
+' "$consolidated_file" | sed 's/\/\.\.\.\//\//g' | sort
 
 # Cleanup
 rm "$temp_file" "$consolidated_file"
