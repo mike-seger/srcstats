@@ -1,26 +1,8 @@
 #!/bin/bash
 
-if [ $# -lt 2 ] ; then
-    echo "$0 <min consolidation path depth> <root path 1> ... [<root path n>]"
-    exit 1
-fi
-
 # Source the configuration from srcstats.env
 SCRIPT_DIR=$(dirname "$0")
 source "$SCRIPT_DIR/srcstats.env"
-
-# Function to check if a path matches any pattern in a list
-matches_any_pattern() {
-    local path="$1"
-    shift
-    local patterns=("$@")
-    for pattern in "${patterns[@]}"; do
-        if [[ "$path" =~ $pattern ]]; then
-            return 0
-        fi
-    done
-    return 1
-}
 
 # Function to count lines in files matching a pattern
 count_lines_matching_pattern() {
@@ -38,6 +20,29 @@ MAX_DEPTH=$1
 shift
 ROOT_DIRS=("$@")
 
+# Build the inclusion patterns
+include_conditions=""
+for pattern in "${START_PATTERNS[@]}"; do
+    if [ -z "$include_conditions" ]; then
+        include_conditions="-path \"${pattern}*\""
+    else
+        include_conditions="$include_conditions -o -path \"${pattern}*\""
+    fi
+done
+
+# Build the exclusion patterns
+exclude_conditions=""
+for pattern in "${EXCLUDE_PATTERNS[@]}"; do
+    if [ -z "$exclude_conditions" ]; then
+        exclude_conditions="! -path \"$pattern\""
+    else
+        exclude_conditions="$exclude_conditions -o ! -path \"$pattern\""
+    fi
+done
+
+# Construct the final find command
+find_command="find ${ROOT_DIRS[@]} -type f \\( $include_conditions \\) \\( $exclude_conditions \\)"
+
 # Temporary file to store intermediate results
 temp_file=$(mktemp)
 consolidated_file=$(mktemp)
@@ -47,75 +52,19 @@ debug() {
     echo "$@" >&2
 }
 
-# Process each root directory
-for ROOT_DIR in "${ROOT_DIRS[@]}"; do
-    debug "Scanning directories in $ROOT_DIR..."
-    find "$ROOT_DIR" -type d | while read -r dir; do
-        # Check if the directory has no child directories
-        if [ -z "$(find "$dir" -mindepth 1 -type d)" ]; then
-            # Check if the directory should be included
-            if matches_any_pattern "$dir" "${INCLUDE_PATTERNS[@]}"; then
-                debug "Processing directory: $dir"
-                # Count files and lines in the directory
-                num_files=0
-                num_lines=0
-                files=$(find "$dir" -type f)
-                for file in $files; do
-                    debug "Considering file: $file"
-                    include_file=false
-                    if matches_any_pattern "$file" "${INCLUDE_PATTERNS[@]}"; then
-                        include_file=true
-                    elif ! matches_any_pattern "$file" "${EXCLUDE_PATTERNS[@]}"; then
-                        include_file=true
-                    fi
-                    if $include_file; then
-                        if [ -f "$file" ]; then
-                            debug "Counting file: $file"
-                            lines_in_file=$(count_lines_matching_pattern "$file")
-                            debug "File: $file, Lines: $lines_in_file"
-                            num_files=$((num_files + 1))
-                            num_lines=$((num_lines + lines_in_file))
-                        fi
-                    else
-                        debug "File excluded: $file"
-                    fi
-                done
+# Process directories
+debug "finding files: $find_command"
 
-                debug "Directory: $dir, Num Files: $num_files, Num Lines: $num_lines"
-                # Output the result with the matched pattern category
-                for pattern in "${INCLUDE_PATTERNS[@]}"; do
-                    if [[ "$dir" =~ $pattern ]]; then
-                        echo -e "${dir}\t${pattern}\t${num_files}\t${num_lines}" >> "$temp_file"
-                        break
-                    fi
-                done
-            else
-                debug "Directory excluded: $dir"
-            fi
-        fi
-    done
+eval $find_command | while read -r file; do
+    lines_in_file=$(count_lines_matching_pattern "$file")
+    echo -e "${file}\t${lines_in_file}" >> "$temp_file"
 done
 
 # Consolidate results for matching directories
 debug "Consolidating results..."
-while read -r line; do
-    dir=$(echo "$line" | awk '{print $1}')
-    pattern=$(echo "$line" | awk '{print $2}')
-    files=$(echo "$line" | awk '{print $3}')
-    lines=$(echo "$line" | awk '{print $4}')
-    for include_pattern in "${INCLUDE_PATTERNS[@]}"; do
-        if [[ "$dir" =~ $include_pattern ]]; then
-            # Extract the base directory up to the matched include pattern
-            base_dir=$(echo "$dir" | awk -v pat="$include_pattern" '{
-                match($0, pat);
-                print substr($0, 1, RLENGTH)
-            }')
-            debug "Consolidating directory: $base_dir, Pattern: $include_pattern, Files: $files, Lines: $lines"
-            echo -e "${base_dir}\t${include_pattern}\t${files}\t${lines}" >> "$consolidated_file"
-            break
-        fi
-    done
-done < "$temp_file"
+awk -F'\t' '{files[$1] += 1; lines[$1] += $2} END {for (dir in files) print dir, files[dir], lines[dir]}' OFS='\t' "$temp_file" > "$consolidated_file"
+
+cp "$consolidated_file" /tmp/1
 
 # Aggregate results with specified depth and categories
 debug "Aggregating final results with max depth $MAX_DEPTH..."
@@ -133,9 +82,9 @@ function trim_path(path, depth) {
     return result "/..."
 }
 {
-    dir = trim_path($1, max_depth) "/" $2
-    files[dir] += $3
-    lines[dir] += $4
+    dir = trim_path($1, max_depth)
+    files[dir] += $2
+    lines[dir] += $3
 }
 END {
     for (dir in files) {
