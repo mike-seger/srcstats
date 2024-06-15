@@ -11,7 +11,7 @@ $ ./srcstats.sh
 A report can be created as follows:
 
 ```
-../srcstats/srcstats.sh 2 . 2>/tmp/debug.txt
+./srcstats.sh 2 . 2>/tmp/debug.txt
 ```                                              
 
 this produces:
