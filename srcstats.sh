@@ -24,9 +24,9 @@ ROOT_DIRS=("$@")
 include_conditions=""
 for pattern in "${START_PATTERNS[@]}"; do
     if [ -z "$include_conditions" ]; then
-        include_conditions="-path \"$pattern*\""
+        include_conditions="-path \"*$pattern*\""
     else
-        include_conditions="$include_conditions -o -path \"$pattern*\""
+        include_conditions="$include_conditions -o -path \"*$pattern*\""
     fi
 done
 
@@ -63,13 +63,30 @@ longest_matching_pattern() {
     echo "$longest_match"
 }
 
+# Function to trim path to max depth
+trim_path() {
+    local path="$1"
+    local depth="$2"
+    IFS='/' read -ra parts <<< "$path"
+    if (( ${#parts[@]} <= depth )); then
+        echo "$path"
+    else
+        result="${parts[0]}"
+        for ((i = 1; i < depth; i++)); do
+            result="$result/${parts[i]}"
+        done
+        echo "$result/..."
+    fi
+}
+
 # Process directories
 debug "finding files: $find_command"
 
 eval $find_command | while read -r file; do
     lines_in_file=$(count_lines_matching_pattern "$file")
     longest_match=$(longest_matching_pattern "$file")
-    echo -e "${file}\t${longest_match}\t${lines_in_file}" >> "$temp_file"
+    trimmed_path=$(trim_path "$file" "$MAX_DEPTH")
+    echo -e "${trimmed_path}\t${longest_match}\t${lines_in_file}" >> "$temp_file"
 done
 
 cat "$temp_file"
