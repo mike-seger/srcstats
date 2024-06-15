@@ -3,6 +3,11 @@
 This is a simple bash script, which can create a report with line and file
 count statistics for source code repositories.
 
+```
+$ ./srcstats.sh                             
+./srcstats.sh <min consolidation path depth> <root path 1> ... [<root path n>]
+```
+
 A report can be created as follows:
 
 ```
@@ -39,5 +44,5 @@ path	| files	| lines
 ./testng-7.4.0/.*/src/test/java	| 858	| 21240
 
 
-Some parameters to create the report can be customized in the file:  
+Some parameters to collect the files for the report can be customized here:  
  `srcstats.env` 
