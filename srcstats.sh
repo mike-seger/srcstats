@@ -34,9 +34,9 @@ done
 exclude_conditions=""
 for pattern in "${EXCLUDE_PATTERNS[@]}"; do
     if [ -z "$exclude_conditions" ]; then
-        exclude_conditions="! -path \"$pattern*\""
+        exclude_conditions="! -path \"*$pattern*\""
     else
-        exclude_conditions="$exclude_conditions -o ! -path \"$pattern*\""
+        exclude_conditions="$exclude_conditions -o ! -path \"*$pattern*\""
     fi
 done
 
@@ -67,6 +67,7 @@ longest_matching_pattern() {
 trim_path() {
     local path="$1"
     local depth="$2"
+    path="${path#./}"  # Strip leading ./
     IFS='/' read -ra parts <<< "$path"
     if (( ${#parts[@]} <= depth )); then
         echo "$path"
