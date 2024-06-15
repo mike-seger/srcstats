@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ $# -lt 2 ] ; then
+    echo "$0 <min consolidation path depth> <root path 1> ... [<root path n>]"
+    exit 1
+fi
+
 # Source the configuration from srcstats.env
 SCRIPT_DIR=$(dirname "$0")
 source "$SCRIPT_DIR/srcstats.env"
