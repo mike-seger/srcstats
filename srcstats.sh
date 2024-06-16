@@ -77,8 +77,24 @@ trim_path() {
         for ((i = 1; i < depth; i++)); do
             result="$result/${parts[i]}"
         done
-        echo "$result/..."
+        echo "$result"
     fi
+}
+
+truncate_at_match() {
+    local s1="$1"
+    local s2="$2"
+    local truncated
+
+    # Check if s1 contains s2
+    if [[ "$s1" == *"$s2"* ]]; then
+        # Remove everything after the match
+        truncated="${s1%%"$s2"*}"
+    else
+        truncated="$s1"
+    fi
+
+    echo "$truncated"
 }
 
 # Process directories
@@ -87,23 +103,24 @@ debug "finding files: $find_command"
 eval $find_command | while read -r file; do
     lines_in_file=$(count_lines_matching_pattern "$file")
     longest_match=$(longest_matching_pattern "$file")
-    trimmed_path=$(trim_path "$file" "$MAX_DEPTH")
-    echo -e "${trimmed_path}\t${longest_match}\t${lines_in_file}" >> "$temp_file"
+    file2=$(truncate_at_match $file $longest_match)    
+    trimmed_path=$(trim_path "$file2" "$MAX_DEPTH")
+    echo -e "${trimmed_path}...${longest_match}\t${lines_in_file}" >> "$temp_file"
 done
 
 # Aggregate results
 awk -F'\t' '
 {
-    key = $1 "\t" $2
-    sum[key] += $3
+    key = $1
+    sum[key] += $2
     count[key] += 1
 }
 END {
     for (key in sum) {
-        print key "\t" sum[key] "\t" count[key]
+        print key "\t" count[key] "\t" sum[key]
     }
 }
-' "$temp_file" > "$aggregated_file"
+' "$temp_file" | sort > "$aggregated_file"
 
 # Output the aggregated results
 cat "$aggregated_file"
