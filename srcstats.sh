@@ -38,6 +38,11 @@ for arg in "$@"; do
     fi
 done
 
+# Check arguments
+if [ "$#" -lt 2 ]; then
+	usage
+fi
+
 MAX_DEPTH=$1
 shift
 ROOT_DIRS=("$@")
@@ -78,12 +83,6 @@ function path_conditions() {
     done
     echo $include_conditions
 }
-
-# Check arguments
-if [ "$#" -lt 1 ]; then
-        echo 002
-	usage
-fi
 
 function longest_matching_pattern() {
     local path="$1"
