@@ -4,8 +4,6 @@ debug=false
 
 function usage() {
     echo "Usage: $0 [-ef <env-file> | -e <env-file-type>] <max_depth> <root_dir1> [<root_dir2> ...]"
-    echo "  for example:"
-    echo "  "
     exit 1
 }
 
