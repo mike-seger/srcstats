@@ -11,10 +11,10 @@ $ ./srcstats.sh
 A report can be created as follows:
 
 ```
-./srcstats.sh 2 . 2>/tmp/debug.txt
+./srcstats.sh -e jvm 1 *kafka*
 ```                                              
 
-this produces:
+this produces somethin like:
 
 path	| files	| lines
 ---	| ---	| ---
