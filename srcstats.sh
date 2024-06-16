@@ -1,15 +1,24 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 debug=false
+
+export tsdate=date
+if [ -x "$(which gdate)" ] ; then
+	export tsdate=gdate
+fi
 
 function usage() {
     echo "Usage: $0 [-ef <env-file> | -e <env-file-type>] <max_depth> <root_dir1> [<root_dir2> ...]"
     exit 1
 }
 
+ts=$($tsdate +%s%N)
 function debug() {
     if [ "$debug" == "true" ] ; then
-        echo "$@" >&2
+	ts1=$($tsdate +%s%3N)
+	diff=$((ts1 - ts))
+	ts=$ts1
+        echo "$diff: $@" >&2
     fi
 }
 
@@ -38,7 +47,7 @@ done
 
 # Check arguments
 if [ "$#" -lt 2 ]; then
-	usage
+    usage
 fi
 
 MAX_DEPTH=$1
@@ -82,13 +91,34 @@ function path_conditions() {
     echo $include_conditions
 }
 
-function longest_matching_pattern() {
+# Pre-compile patterns
+declare -A COMPILED_PATTERNS
+for pattern in "${FILE_PATTERNS[@]}"; do
+    COMPILED_PATTERNS["$pattern"]="$(conv_pattern "$pattern")"
+done
+
+function longest_matching_pattern1() {
     local path="$1"
     local longest_match=""
     for pattern in "${FILE_PATTERNS[@]}"; do
         pat=$(conv_pattern "$pattern")
         if [[ "$path" == $pat ]] && [[ ${#pattern} -gt ${#longest_match} ]]; then
             longest_match="$pattern"
+        fi
+    done
+    echo "$longest_match"
+}
+
+function longest_matching_pattern() {
+    local path="$1"
+    local longest_match=""
+    local longest_length=0
+
+    for pattern in "${!COMPILED_PATTERNS[@]}"; do
+        local pat="${COMPILED_PATTERNS[$pattern]}"
+        if [[ "$path" == $pat ]] && [[ ${#pattern} -gt $longest_length ]]; then
+            longest_match="$pattern"
+            longest_length=${#pattern}
         fi
     done
     echo "$longest_match"
@@ -128,24 +158,31 @@ truncate_at_match() {
 
 echo "Checking n files: $(find ${ROOT_DIRS[@]} -type f|wc -l)"
 find ${ROOT_DIRS[@]} -type f | while read -r file; do
-    debug "$file"
-    if [ $(is_binary "$file") ] ; then
-        debug "Skipping binary file: $file"
-        continue
+    debug "Stats: $file"
+    longest_match=$(longest_matching_pattern "$file")
+    if [ -z "$longest_match" ] ; then
+        debug "Non matching file pattern: $file"
+    else
+        if [ $(is_binary "$file") ] ; then
+            debug "Skipping binary file: $file"
+            continue
+        fi    
     fi
+#    debug "X002 match"
     lines_in_file=$(count_lines_matching_pattern "$file")
     if [ "$lines_in_file" -lt "$MIN_FILE_LINES" ] ; then
         debug "File has less than $MIN_FILE_LINES lines: $file"
         continue
     fi
-    longest_match=$(longest_matching_pattern "$file")
-    if [ -z "$longest_match" ] ; then
-        debug "Non matching file pattern: $file"
-    fi
+#    debug "X003 count"
     file2=$(truncate_at_match $file $longest_match)    
+#    debug "X004 trunc"
     trimmed_path=$(trim_path "$file2" "$MAX_DEPTH")
+#    debug "X005 trim"
     lmpat=$(echo "$longest_match" | tr -d '$*'|sed -e "s#^\.*##")
+#    debug "X006 lmpat"
     echo -e "${trimmed_path}...${lmpat}\t${lines_in_file}"
+#    debug "X007 echo"
 done |\
 awk -F'\t' '
 {
