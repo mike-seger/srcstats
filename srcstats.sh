@@ -85,15 +85,6 @@ if [ "$#" -lt 1 ]; then
 	usage
 fi
 
-# Build the inclusion patterns
-#include_conditions=$(path_conditions " " "${FILE_PATTERNS[@]}")
-
-# Build the exclusion patterns
-#exclude_conditions=$(path_conditions '!' "${EXCLUDE_PATTERNS[@]}")
-
-# Construct the final find command
-#find_command="find ${ROOT_DIRS[@]} -type f \\( $include_conditions \\) \\( $exclude_conditions \\)"
-
 function longest_matching_pattern() {
     local path="$1"
     local longest_match=""
@@ -139,7 +130,6 @@ truncate_at_match() {
 }
 
 echo "Checking n files: $(find ${ROOT_DIRS[@]} -type f|wc -l)"
-#eval $find_command | while read -r file; do
 find ${ROOT_DIRS[@]} -type f | while read -r file; do
     debug "$file"
     if [ $(is_binary "$file") ] ; then
